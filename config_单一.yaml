@@ -1,0 +1,258 @@
+# mihomo 分层代理策略组配置模板 · 单一版
+# 单订阅源（main），无分档；三订阅源分档版见 config_聚合.yaml
+
+# ==================== 锚点配置 ====================
+BaseProvider: &BaseProvider {type: http, interval: 86400, proxy: DIRECT, health-check: {enable: true, url: 'https://www.google.com/generate_204', interval: 300}, filter: '^(?!.*(群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author))'}
+
+BaseFB: &BaseFB       {type: fallback, interval: 200, lazy: true, url: 'https://www.google.com/generate_204'}
+BaseUT: &BaseUT       {type: url-test, interval: 200, lazy: true, url: 'https://www.google.com/generate_204'}
+
+# （排除1/排除2 为占位词，替换为你自己的节点排除关键词）
+FilterHK: &FilterHK '^(?=.*(?i)(港|🇭🇰|HK|Hong|HKG))(?!.*(排除1|排除2)).*$'
+FilterSG: &FilterSG '^(?=.*(?i)(坡|🇸🇬|SG|Sing|SIN|XSP))(?!.*(排除1|排除2)).*$'
+FilterJP: &FilterJP '^(?=.*(?i)(日|🇯🇵|JP|Japan|NRT|HND|KIX|CTS|FUK))(?!.*(排除1|排除2)).*$'
+FilterKR: &FilterKR '^(?=.*(?i)(韩|🇰🇷|韓|首尔|南朝鲜|KR|KOR|Korea|South))(?!.*(排除1|排除2)).*$'
+FilterUS: &FilterUS '^(?=.*(?i)(美国|🇺🇸|US|USA|SJC|JFK|LAX|ORD|ATL|DFW|SFO|MIA|SEA|IAD))(?!.*(排除1|排除2)).*$'
+FilterTW: &FilterTW '^(?=.*(?i)(台|🇼🇸|🇹🇼|TW|tai|TPE|TSA|KHH))(?!.*(排除1|排除2)).*$'
+FilterEU: &FilterEU '^(?=.*(?i)(奥|比|保|克罗地亚|塞|捷|丹|爱沙|芬|法|德|希|匈|爱尔|意|拉|立|卢|马其它|荷|波|葡|罗|斯洛伐|斯洛文|西|瑞|英|🇧🇪|🇨🇿|🇩🇰|🇫🇮|🇫🇷|🇩🇪|🇮🇪|🇮🇹|🇱🇹|🇱🇺|🇳🇱|🇵🇱|🇸🇪|🇬🇧|CDG|FRA|AMS|MAD|BCN|FCO|MUC|BRU))(?!.*(排除1|排除2)).*$'
+FilterAL: &FilterAL '^(?!.*(DIRECT|直接连接|群|邀请|返利|循环|官网|客服|网站|网址|获取|订阅|流量|到期|机场|下次|版本|官址|备用|过期|已用|联系|邮箱|工单|贩卖|通知|倒卖|防止|国内|地址|频道|无法|说明|使用|提示|特别|访问|支持|教程|关注|更新|作者|加入|USE|USED|TOTAL|EXPIRE|EMAIL|Panel|Channel|Author))'
+
+# 词表由 FilterHK/TW/JP/SG/KR/US/EU 机械合并派生（101 个 token），增删地区 token 时需同步重建
+FilterOTHER: &FilterOTHER '^(?!.*(?i)(港|🇭🇰|HK|Hong|HKG|台|🇼🇸|🇹🇼|TW|tai|TPE|TSA|KHH|日|🇯🇵|JP|Japan|NRT|HND|KIX|CTS|FUK|坡|🇸🇬|SG|Sing|SIN|XSP|韩|🇰🇷|韓|首尔|南朝鲜|KR|KOR|Korea|South|美国|🇺🇸|US|USA|SJC|JFK|LAX|ORD|ATL|DFW|SFO|MIA|SEA|IAD|奥|比|保|克罗地亚|塞|捷|丹|爱沙|芬|法|德|希|匈|爱尔|意|拉|立|卢|马其它|荷|波|葡|罗|斯洛伐|斯洛文|西|瑞|英|🇧🇪|🇨🇿|🇩🇰|🇫🇮|🇫🇷|🇩🇪|🇮🇪|🇮🇹|🇱🇹|🇱🇺|🇳🇱|🇵🇱|🇸🇪|🇬🇧|CDG|FRA|AMS|MAD|BCN|FCO|MUC|BRU))(?!.*(排除1|排除2|过滤掉|懒人节点)).*$'
+
+SelectAL: &SelectAL {type: select, proxies: [自动选择, 故障转移, 香港智能, 台湾智能, 日本智能, 狮城智能, 韩国智能, 美国智能, 欧洲智能, 其他智能, 手动选择, 直接连接]}
+OneSmart: &OneSmart {type: select, proxies: [一键智能, 自动选择, 故障转移, 香港智能, 台湾智能, 日本智能, 狮城智能, 韩国智能, 美国智能, 欧洲智能, 其他智能, 手动选择, 直接连接]}
+SelectDC: &SelectDC {type: select, proxies: [直接连接, 自动选择, 故障转移, 香港智能, 台湾智能, 日本智能, 狮城智能, 韩国智能, 美国智能, 欧洲智能, 其他智能, 一键智能, 手动选择]}
+SelectProxy: &SelectProxy {type: select, proxies: [自动选择, 故障转移, 香港智能, 台湾智能, 日本智能, 狮城智能, 韩国智能, 美国智能, 欧洲智能, 其他智能, 一键智能, 手动选择, 直接连接]}
+
+# ==================== 代理提供者 ====================
+proxy-providers:
+  main: {<<: *BaseProvider, url: 'https://example.com/api/v1/client/subscribe?token=YOUR_TOKEN'}
+# ==================== 监听器 ====================
+listeners:
+  - {name: MIXED-SG, type: mixed, port: 50000, proxy: 狮城智能}
+  - {name: MIXED-US, type: mixed, port: 50001, proxy: 美国智能}
+  - {name: MIXED-TW, type: mixed, port: 50002, proxy: 台湾智能}
+  - {name: MIXED-HK, type: mixed, port: 50003, proxy: 香港智能}
+  - {name: MIXED-JP, type: mixed, port: 50004, proxy: 日本智能}
+  - {name: MIXED-KR, type: mixed, port: 50005, proxy: 韩国智能}
+  - {name: MIXED-EU, type: mixed, port: 50006, proxy: 欧洲智能}
+  - {name: MIXED-AL, type: mixed, port: 50007, proxy: 一键智能}
+
+# ==================== 核心配置 ====================
+mode: rule
+port: 7890
+socks-port: 7891
+redir-port: 7892
+mixed-port: 7893
+tproxy-port: 7895
+ipv6: true
+allow-lan: true
+unified-delay: true
+tcp-concurrent: true
+log-level: warning
+bind-address: '*'
+find-process-mode: 'always'
+keep-alive-interval: 15
+keep-alive-idle: 600
+
+# geo 数据下载源（mihomo 默认走 raw.githubusercontent.com，国内不可达，改用 jsDelivr 镜像）
+geox-url:
+  geoip: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geoip.dat
+  geosite: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/geosite.dat
+  mmdb: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/country.mmdb
+  asn: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@release/GeoLite2-ASN.mmdb
+
+skip-auth-prefixes:
+  - 192.168.1.0/24
+  - 10.0.0.0/8
+  - 172.16.0.0/12
+  - 127.0.0.1/8
+
+experimental:
+  quic-go-disable-gso: true
+
+profile:
+  store-selected: true
+  store-fake-ip: true
+
+sniffer:
+  enable: true
+  sniff:
+    HTTP:
+      ports: [80, 8080-8880]
+      override-destination: true
+    TLS:
+      ports: [443, 8443]
+    QUIC:
+      ports: [443, 8443]
+  skip-domain:
+    - "Mijia Cloud"
+    - "+.push.apple.com"
+
+tun:
+  enable: false
+  stack: mixed
+  dns-hijack:
+    - "any:53"
+    - "tcp://any:53"
+  auto-route: true
+  auto-redirect: true
+  auto-detect-interface: true
+
+dns:
+  enable: true
+  ipv6: true
+  enhanced-mode: fake-ip
+  fake-ip-range: 198.18.0.1/16
+  default-nameserver:
+    - 119.29.29.29
+    - 223.6.6.6
+  nameserver:
+    - https://dns.alidns.com/dns-query
+    - https://doh.pub/dns-query
+  fake-ip-filter:
+    - rule-set:GeoCn
+    - rule-set:Private
+    - rule-set:China
+    - +.miwifi.com
+    - +.docker.io
+    - +.market.xiaomi.com
+    - +.push.apple.com
+
+# ==================== 代理策略组 ====================
+proxy-groups:
+  - {name: 一键智能,  <<: *SelectAL, icon: https://github.com/666OS/YYDS/raw/main/mihomo/image/mihomo.png}
+  - {name: 网络测试,  <<: *OneSmart, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Speedtest.png, include-all: true}
+  - {name: ChatGPT,    <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/ChatGPT.png}
+  - {name: Gemini,     <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Google_Search.png}
+  - {name: Copilot,    <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Copilot.png}
+  - {name: 其他AI,     <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/AI.png}
+  - {name: 电报消息,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Telegram_X.png}
+  - {name: 社交平台,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/PBS.png}
+  - {name: 游戏平台,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Game.png}
+  - {name: 货币平台,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Cryptocurrency_3.png}
+  - {name: 国际媒体,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/DomesticMedia.png}
+  - {name: TikTok,   <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/TikTok.png}
+  - {name: 苹果服务,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Apple.png}
+  - {name: 谷歌服务,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Google_Search.png}
+  - {name: 微软服务,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Microsoft.png}
+  - {name: GitHub,    <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/GitHub.png}
+  - {name: 脸书服务,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Facebook.png}
+  - {name: 国外流量,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Global.png}
+  - {name: 国内流量,  <<: *SelectDC, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/China.png}
+  - {name: 兜底流量,  <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Final.png}
+  - {name: 手动选择,  type: select, include-all: true, filter: *FilterAL, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Clubhouse.png}
+  - {name: 直接连接,  type: select, proxies: [DIRECT], hidden: true, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Direct.png}
+
+  - {name: 自动选择,  <<: *BaseUT, use: [main], icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Round_Robin_1.png}
+  - {name: 故障转移,  <<: *BaseFB, use: [main], icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Round_Robin_1.png}
+
+  # ── 香港 ──
+  - {name: 香港智能,  type: select, include-all: true, filter: *FilterHK, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Hong_Kong.png}
+  # ── 台湾 ──
+  - {name: 台湾智能,  type: select, include-all: true, filter: *FilterTW, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Taiwan.png}
+  # ── 日本 ──
+  - {name: 日本智能,  type: select, include-all: true, filter: *FilterJP, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Japan.png}
+  # ── 狮城 ──
+  - {name: 狮城智能,  type: select, include-all: true, filter: *FilterSG, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Singapore.png}
+  # ── 韩国 ──
+  - {name: 韩国智能,  type: select, include-all: true, filter: *FilterKR, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Korea.png}
+  # ── 美国 ──
+  - {name: 美国智能,  type: select, include-all: true, filter: *FilterUS, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/United_States.png}
+  # ── 欧洲 ──
+  - {name: 欧洲智能,  type: select, include-all: true, filter: *FilterEU, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/European_Union.png}
+  # ── 其他 ──
+  - {name: 其他智能,  type: select, include-all: true, filter: *FilterOTHER, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/World_Map.png}
+# ==================== 规则路由 ====================
+rules:
+  - DOMAIN-SUFFIX,sharepoint.com,直接连接
+
+  - RULE-SET,Tracking,REJECT
+  - RULE-SET,Advertising,REJECT
+  - AND,((DST-PORT,443),(NETWORK,UDP),(NOT,((GEOIP,CN)))),REJECT  # 阻止海外 QUIC
+
+  - RULE-SET,Private,直接连接
+  - RULE-SET,AppleCN,直接连接
+
+  # 人工智能拆分规则 - 顺序敏感：ChatGPT/Gemini/Copilot 必须在 AI 兜底规则之前
+  - RULE-SET,OpenAI,ChatGPT
+  - RULE-SET,Gemini,Gemini
+  - DOMAIN-SUFFIX,copilot.microsoft.com,Copilot
+  - DOMAIN-SUFFIX,copilot.cloud.microsoft,Copilot
+  - DOMAIN-SUFFIX,microsoft-copilot.com,Copilot
+  - DOMAIN-SUFFIX,copilot.com,Copilot
+  - DOMAIN-SUFFIX,copilot-stg.com,Copilot
+  - DOMAIN-SUFFIX,cocopilot.org,Copilot
+  - DOMAIN-SUFFIX,githubcopilot.com,Copilot
+  - DOMAIN-SUFFIX,githubnext.com,Copilot
+  - DOMAIN-SUFFIX,copilot.github.com,Copilot
+  - DOMAIN-SUFFIX,copilot-proxy.githubusercontent.com,Copilot
+  - DOMAIN-SUFFIX,copilot-telemetry.githubusercontent.com,Copilot
+  - DOMAIN-SUFFIX,copilot-telemetry-service.githubusercontent.com,Copilot
+  - DOMAIN-SUFFIX,copilot-workspace.githubnext.com,Copilot
+  - DOMAIN-SUFFIX,copilotprodattachments.blob.core.windows.net,Copilot
+  - DOMAIN-SUFFIX,edgeservices.bing.com,Copilot
+  - DOMAIN-SUFFIX,sydney.bing.com,Copilot
+  - DOMAIN-SUFFIX,www.bing.com,Copilot
+  - RULE-SET,AI,其他AI
+
+  - DOMAIN-KEYWORD,speedtest,网络测试
+  - RULE-SET,Speedtest,网络测试
+  - RULE-SET,Telegram,电报消息
+  - RULE-SET,SocialMedia,社交平台
+  - RULE-SET,Games,游戏平台
+  - RULE-SET,Crypto,货币平台
+  # TikTok 需在 Streaming 之前匹配（category-entertainment.mrs 内也含 TikTok 域名）
+  - RULE-SET,TikTok,TikTok
+  - RULE-SET,Streaming,国际媒体
+  - RULE-SET,Apple,苹果服务
+  - RULE-SET,Google,谷歌服务
+  # 必须置于 微软服务 之前 —— geosite/microsoft.mrs 同样包含全部 github 域名
+  - RULE-SET,GitHub,GitHub
+  - RULE-SET,Microsoft,微软服务
+  - RULE-SET,Facebook,脸书服务
+  - RULE-SET,Proxy,国外流量
+  - RULE-SET,China,国内流量
+
+  - RULE-SET,PrivateIP,直接连接,no-resolve
+  - RULE-SET,TelegramIP,电报消息,no-resolve
+  - RULE-SET,GoogleIP,谷歌服务,no-resolve
+  - RULE-SET,FacebookIP,脸书服务,no-resolve
+  - RULE-SET,ChinaIP,国内流量
+
+  - MATCH,兜底流量
+
+# ==================== 规则集 ====================
+BehaviorDN: &BehaviorDN {type: http, behavior: domain, format: mrs, interval: 86400}
+BehaviorIP: &BehaviorIP {type: http, behavior: ipcidr, format: mrs, interval: 86400}
+
+rule-providers:
+  Tracking:       {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-ads-all.mrs}
+  Advertising:    {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-ads.mrs}
+  Private:        {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/private.mrs}
+  Speedtest:      {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/speedtest.mrs}
+  OpenAI:         {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/openai.mrs}
+  Gemini:         {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/google-gemini.mrs}
+  AI:             {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-ai-!cn.mrs}
+  Telegram:       {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/telegram.mrs}
+  SocialMedia:    {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-social-media-!cn.mrs}
+  Games:          {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-games.mrs}
+  Crypto:         {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-cryptocurrency.mrs}
+  Streaming:      {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/category-entertainment.mrs}
+  TikTok:         {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/tiktok.mrs}
+  AppleCN:        {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/apple-cn.mrs}
+  Apple:          {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/apple.mrs}
+  Google:         {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/google.mrs}
+  Microsoft:      {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/microsoft.mrs}
+  GitHub:         {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/github.mrs}
+  Facebook:       {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/facebook.mrs}
+  Proxy:          {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/geolocation-!cn.mrs}
+  China:          {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/cn.mrs}
+  GeoCn:          {<<: *BehaviorDN, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geosite/geolocation-cn.mrs}
+
+  PrivateIP:      {<<: *BehaviorIP, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/private.mrs}
+  TelegramIP:     {<<: *BehaviorIP, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/telegram.mrs}
+  GoogleIP:       {<<: *BehaviorIP, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/google.mrs}
+  FacebookIP:     {<<: *BehaviorIP, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/facebook.mrs}
+  ChinaIP:        {<<: *BehaviorIP, url: https://cdn.jsdelivr.net/gh/MetaCubeX/meta-rules-dat@meta/geo/geoip/cn.mrs}
