@@ -7,7 +7,7 @@
 | 文件 | 订阅源 | 分档 | 地区组形态 | 适用场景 |
 |---|---|---|---|---|
 | [`config_聚合.yaml`](config_聚合.yaml) | 3 个：`premium` / `standard` / `backup` | 有 `[优]` / `[中]` / `[备]` | 入口组（select）→ 3 个档位组（url-test）+ 该地区全部节点 | 手上有多个机场/订阅，想按质量分档调度 |
-| [`config_单一.yaml`](config_单一.yaml) | 1 个：`main` | 无 | 入口组（select）直接平铺该地区全部节点，无子组 | 只有一个订阅，或不需要分档，越平越好 |
+| [`config_单一.yaml`](config_单一.yaml) | 1 个：`main` | 无 | **每地区两组**：`X自动`（url-test 择优）+ `X手动`（select 选点），都直接平铺该地区全部节点 | 只有一个订阅，或不需要分档，越平越好 |
 
 > 所有订阅链接、个人域名、内网网段均已抹除为占位符，可直接公开分发；按下文「快速开始」替换为你自己的内容即可使用。
 > 两种版本均通过 `mihomo -t`（v1.19.32）配置校验。
@@ -18,35 +18,36 @@
 rules（规则路由）
   └─ 命中 → 应用策略层（select，按场景选线路）
               └─ 线路特性层（url-test / fallback，全部节点自动测速）
-                    └─ 地理策略层（入口组 select → 地区分组）
+                    └─ 地理策略层（按地区分组的 select / url-test 组）
                           └─ proxy-providers（订阅源）
 ```
 
 | 层 | 策略组 | 类型 | 作用 |
 |---|---|---|---|
-| 应用策略层 | 一键智能 / ChatGPT / Gemini / Copilot / 其他AI / 电报消息 / 社交平台 / 游戏平台 / 货币平台 / 国际媒体 / TikTok / 苹果服务 / 谷歌服务 / 微软服务 / GitHub / 脸书服务 / 国外流量 / 国内流量 / 兜底流量 / 手动选择 | `select` | 按流量场景选择出口，成员平铺各「地区智能」入口组 + 线路特性组 |
+| 应用策略层 | 网络测试 / ChatGPT / Gemini / Copilot / 其他AI / 电报消息 / 社交平台 / 游戏平台 / 货币平台 / 国际媒体 / TikTok / 苹果服务 / 谷歌服务 / 微软服务 / GitHub / 脸书服务 / 国外流量 / 国内流量 / 手动选择 | `select` | 按流量场景选择出口，成员平铺各地区组 + 线路特性组 |
 | 线路特性层 | 自动选择 / 故障转移 | `url-test` / `fallback` | `use:` 直接拉取全部订阅节点，组内自动测速/故障切换，不引用任何策略组 |
-| 地理策略层（两版共用 8 个入口组） | 香港/台湾/日本/狮城/韩国/美国/欧洲/其他 智能 | `select` | 按正则筛出该地区节点，供应用层选用 |
+| 地理策略层（两版都是 8 个地区） | 香港/台湾/日本/狮城/韩国/美国/欧洲/其他 | 聚合：`select` 入口 + `url-test` 档位；单一：`url-test` 自动 + `select` 手动 | 按正则筛出该地区节点，供应用层选用 |
 
 地理策略层在两版里的内部结构不同：
 
 ```
-聚合版                              单一版
-香港智能 (select)                    香港智能 (select)
- ├─ 香港[优]  (url-test)  ← [优] 前缀   └─ 该地区全部节点（平铺，无子组）
- ├─ 香港[中]  (url-test)  ← [中] 前缀
- ├─ 香港[备]  (url-test)  ← [备] 前缀
+聚合版                                单一版
+香港智能 (select)                      香港自动 (url-test) ─ 档内自动择优
+ ├─ 香港[优] (url-test) ← [优] 前缀     香港手动 (select)   ─ 该地区全部节点平铺
+ ├─ 香港[中] (url-test) ← [中] 前缀
+ ├─ 香港[备] (url-test) ← [备] 前缀
  └─ 该地区全部节点
 ```
 
-单一版若想「地区内自动择优」而不是手动选点，把该组 `type: select` 换成 `type: url-test` 即可（其余字段不用动）。
+单一版没有「智能」这种包装组：每个地区只有两个平级组，自动的走 `url-test` 自动择优，手动的走 `select` 手动选点，两者成员都是该地区全部节点（`include-all` + `filter`）。要手动指定某个节点，把上层场景组切到对应 `X手动` 再选节点即可。
 
 ## 核心设计
 
 - **分档前缀（仅聚合版）**：三个订阅源分别通过 `override.additional-prefix` 给节点名追加 `[优] `/`[中] `/`[备] `，档位组用 `Filter<地区>_YOU/_ZHONG/_BEI` 正则按前缀收人；「优」档额外排除 `lite` 线路（`(?!.*(?i)lite)`）。单一版无前缀、无档位正则，节点名保持订阅原样。
 - **「其他」地区**：`FilterOTHER` 为全部地区词表取反，收纳不属任何地区的残余节点，避免漏网。
-- **入口组平铺**：聚合版 = `proxies` 前置三个档位组 + `include-all` 该地区全部节点；单一版 = 仅 `include-all` + `filter`，选具体节点无需再进子组。
-- **锚点模板**：`BaseProvider` / `BaseFB` / `BaseUT` / `SelectAL` / `OneSmart` / `SelectDC` / `SelectProxy` / `Filter*` 全部用 YAML anchor + merge key（`<<:`）定义，改一处生效全局。
+- **地区组平铺**：聚合版 = 入口组 `proxies` 前置三个档位组 + `include-all` 该地区全部节点；单一版 = 每个地区两个平级组（`X自动` url-test / `X手动` select），只用 `include-all` + `filter`，无包装组、无子组。
+- **无 一键智能 / 兜底流量**：两版均不设这两个聚合出口；`MATCH` 兜底落到 `国外流量`，`MIXED-AL` 监听端口同样指向 `国外流量`。
+- **锚点模板**：`BaseProvider` / `BaseFB` / `BaseUT` / `OneSmart` / `SelectDC` / `SelectProxy` / `Filter*` 全部用 YAML anchor + merge key（`<<:`）定义，改一处生效全局。
 - **规则顺序敏感点**（`rules` 内已注释标注）：
   - ChatGPT / Gemini / Copilot 必须位于 AI 兜底规则（`RULE-SET,AI`）之前；
   - TikTok 必须位于 Streaming（`category-entertainment`）之前；
