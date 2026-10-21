@@ -53,6 +53,7 @@ rules（规则路由）
   - TikTok 必须位于 Streaming（`category-entertainment`）之前；
   - GitHub 必须位于 微软服务 之前（`microsoft.mrs` 同样包含全部 github 域名）。
 - **规则集来源**：全部取自 mihomo 官方 [MetaCubeX/meta-rules-dat](https://github.com/MetaCubeX/meta-rules-dat)（meta 分支 `.mrs`），经 **jsDelivr 镜像**分发，规避 `raw.githubusercontent.com` 不可达；`geox-url` 的 geoip/geosite/mmdb/asn 同样走 jsDelivr。
+- **订阅拉取中转（聚合版）**：`standard` / `backup` 的 provider 带 `proxy: 订阅拉取`，由该 url-test 组（`use: [premium]`）挑一个 premium 节点去拉订阅。订阅域名被 TLS 阻断时直连会 `handshake timeout`，走节点中转才能拉到；premium 本身仍直连，不会成环。
 - **分地区监听端口**：`listeners` 提供 50000–50007 八个 mixed 端口，按地区绑定出口，供浏览器插件 / 手机 APP 分地区访问。
 - **fake-ip**：`fake-ip-filter` 放行 GeoCn/Private/China 规则集与小米/苹果域名，自建域名需自行追加。
 
@@ -80,6 +81,40 @@ A    www.baidu.com  → 223.109.82.…   国内真实 A
 
 - **`dns.filter-aaaa` 不是 mihomo 的字段**。官方文档没有、二进制里没有，写上去不报错但**完全不生效**：加上它之后 `AAAA` 依旧返回 `fc00::4`。真正让境外 AAAA 变空的是「不配 `fake-ip-range6`」——一旦补上 range6，fake AAAA 立刻回来。
 - `dns.ipv6: false` 有效但太粗：它是全局的，国内 AAAA 会一起消失，与「保留国内」冲突。
+
+## 部署到 OpenClash（实测）
+
+配置文件放进 `/etc/openclash/config/`，再把 `config_path` 指过去。**光放文件不够**——OpenClash 会用 uci 覆盖配置里的若干字段，下面这些开关必须一起改，否则配置会被"改回去"：
+
+| uci 项 | 单一版（AX6 / arm64） | 聚合版（x86） | 为什么 |
+|---|---|---|---|
+| `openclash.config.ipv6_enable` | `1` | `1` | 为 `0` 时 OpenClash 把顶层 `ipv6` 写成 `false`，国内 AAAA 一起消失 |
+| `openclash.config.ipv6_dns` | `1` | `1` | **它才是 `dns.ipv6` 的来源**；为 `0` 时强制 `dns.ipv6: false`，内核层直接不解析 AAAA |
+| `openclash.config.auto_smart_switch` | `0` | `0` | 为 `1` 时把配置里所有 `url-test` 组改写成 `smart` 类型（面板显示 Smart），"自动"就不按延迟择优了 |
+| `openclash.config.enable_custom_dns` | `0` | `0` | 为 `1` 时用界面里的 DNS 服务器列表覆盖配置文件的 `dns` 段，本项目的 AAAA 分流全部失效 |
+
+改完必须**强制全量重建**，否则 OpenClash 的「快速启动」会继续用旧产物：
+
+```sh
+rm -f /tmp/openclash.change          # 清掉 mtime 记录，强制 QUICK_START=false
+/etc/init.d/openclash stop
+/etc/init.d/openclash start          # 重建 → /etc/openclash/<同名>.yaml → 内核 -f 该文件
+```
+
+⚠️ 三个坑：
+
+- **`restart` 会空转**：init 脚本对已在运行的实例直接回 `OpenClash Already Start!`，配置根本不重建，得 `stop` + `start` 分开执行。
+- **内核实际读的是 `/etc/openclash/<文件名>.yaml`**（`basename config_path` 的副本，经过 `yml_change.sh` 改写），不是 `config/` 下那份源文件；后台 `ps` 里能看到 `-f` 的真实路径。
+- **别用 `exec /etc/init.d/openclash stop; ... start`**：`exec` 会替换掉当前 shell，后半段永不执行，结果只停不起。
+
+部署后自检（面板端口 + secret 换成你的）：
+
+```sh
+curl -s -H "Authorization: Bearer <secret>" http://127.0.0.1:9090/proxies \
+  | jq -r '.proxies | to_entries[] | select(.value.all) | "\(.key)\t\(.value.type)\t\(.value.all|length)"'
+```
+
+`type` 应该是 `URLTest` / `Selector` / `Fallback`，出现 `Smart` 就说明 `auto_smart_switch` 没关。
 
 ## 快速开始
 

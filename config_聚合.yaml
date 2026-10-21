@@ -52,8 +52,9 @@ SelectProxy: &SelectProxy {type: select, proxies: [自动选择, 故障转移, �
 # ==================== 代理提供者 ====================
 proxy-providers:
   premium: {<<: *BaseProvider, url: 'https://example.com/api/v1/client/subscribe?token=YOUR_PREMIUM_TOKEN', override: {additional-prefix: '[优] '}}
-  standard: {<<: *BaseProvider, url: 'https://example.com/api/v1/client/subscribe?token=YOUR_STANDARD_TOKEN', override: {additional-prefix: '[中] '}}
-  backup: {<<: *BaseProvider, url: 'https://example.com/api/v1/client/subscribe?token=YOUR_BACKUP_TOKEN', override: {additional-prefix: '[备] '}}
+  # 订阅域名可能被墙（TLS 被阻断时直连拉取会 timeout）：走「订阅拉取」组用 premium 节点中转
+  standard: {<<: *BaseProvider, proxy: 订阅拉取, url: 'https://example.com/api/v1/client/subscribe?token=YOUR_STANDARD_TOKEN', override: {additional-prefix: '[中] '}}
+  backup: {<<: *BaseProvider, proxy: 订阅拉取, url: 'https://example.com/api/v1/client/subscribe?token=YOUR_BACKUP_TOKEN', override: {additional-prefix: '[备] '}}
 # ==================== 监听器 ====================
 listeners:
   - {name: MIXED-SG, type: mixed, port: 50000, proxy: 狮城智能}
@@ -166,6 +167,8 @@ dns:
 
 # ==================== 代理策略组 ====================
 proxy-groups:
+  # 订阅拉取出口：provider 的 proxy 指向这里，用 premium 节点去拉被墙的订阅源（url-test 自动择优）
+  - {name: 订阅拉取, type: url-test, use: [premium], url: 'https://www.google.com/generate_204', interval: 900, lazy: true, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Cloudflare.png}
   - {name: 网络测试,  <<: *OneSmart, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Speedtest.png, include-all: true}
   - {name: ChatGPT,    <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/ChatGPT.png}
   - {name: Gemini,     <<: *SelectProxy, icon: https://github.com/Koolson/Qure/raw/master/IconSet/Color/Google_Search.png}
