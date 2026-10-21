@@ -56,6 +56,31 @@ rules（规则路由）
 - **分地区监听端口**：`listeners` 提供 50000–50007 八个 mixed 端口，按地区绑定出口，供浏览器插件 / 手机 APP 分地区访问。
 - **fake-ip**：`fake-ip-filter` 放行 GeoCn/Private/China 规则集与小米/苹果域名，自建域名需自行追加。
 
+## IPv6 策略
+
+节点只有 IPv4，目标是：**代理链路一律 IPv4，国内域名仍保留 AAAA 供直连**。
+
+| 位置 | 配置 | 作用 |
+|---|---|---|
+| `dns.fake-ip-range6` | **刻意不设置** | fake-ip 模式下 AAAA 直接空解析 —— 境外域名拿不到任何 IPv6 地址 |
+| `dns.nameserver` / `dns.proxy-server-nameserver` | `#disable-ipv6=true` | 真实解析路径（白名单域名、节点域名、redir-host）丢弃 AAAA |
+| `dns.nameserver-policy` | `rule-set:GeoCn` / `China` / `Private` → **不带参数**的国内 DoH | 国内 / 私有域名保留真实 AAAA，可 IPv6 直连 |
+| `ipv6`（顶层） | `true` | 内核仍接受 IPv6，否则国内 AAAA 也白给 |
+
+实测（mihomo v1.19.32，fake-ip 模式）：
+
+```
+AAAA www.google.com → 空             境外不下发 IPv6
+A    www.google.com → 198.18.0.4     fake-ip 正常
+AAAA www.baidu.com  → 2409:8c20:…    国内真实 AAAA（policy 放行）
+A    www.baidu.com  → 223.109.82.…   国内真实 A
+```
+
+⚠️ 两个坑（都实测过）：
+
+- **`dns.filter-aaaa` 不是 mihomo 的字段**。官方文档没有、二进制里没有，写上去不报错但**完全不生效**：加上它之后 `AAAA` 依旧返回 `fc00::4`。真正让境外 AAAA 变空的是「不配 `fake-ip-range6`」——一旦补上 range6，fake AAAA 立刻回来。
+- `dns.ipv6: false` 有效但太粗：它是全局的，国内 AAAA 会一起消失，与「保留国内」冲突。
+
 ## 快速开始
 
 ### 用聚合版（多段订阅 + 分档）

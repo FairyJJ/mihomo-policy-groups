@@ -45,6 +45,7 @@ socks-port: 7891
 redir-port: 7892
 mixed-port: 7893
 tproxy-port: 7895
+# IPv6：顶层保留 true（国内域名要直连 IPv6）；代理侧靠「不配 fake-ip-range6 + 非 CN 域名不返回 AAAA」保证不走 IPv6
 ipv6: true
 allow-lan: true
 unified-delay: true
@@ -101,16 +102,32 @@ tun:
 
 dns:
   enable: true
+  # 保留 AAAA 解析能力（国内域名要用），国外域名靠 nameserver 的 disable-ipv6 参数单独丢弃
   ipv6: true
-  filter-aaaa: true
   enhanced-mode: fake-ip
   fake-ip-range: 198.18.0.1/16
   default-nameserver:
     - 119.29.29.29
     - 223.6.6.6
+  # 默认口径（非国内域名）：丢弃 AAAA —— 节点无 IPv6，代理链路一律走 IPv4
   nameserver:
-    - https://dns.alidns.com/dns-query
-    - https://doh.pub/dns-query
+    - https://dns.alidns.com/dns-query#disable-ipv6=true
+    - https://doh.pub/dns-query#disable-ipv6=true
+  # 节点域名只解析 A 记录，避免节点本身被解析到 IPv6 而拨号失败
+  proxy-server-nameserver:
+    - https://dns.alidns.com/dns-query#disable-ipv6=true
+    - https://doh.pub/dns-query#disable-ipv6=true
+  # 国内 / 私有域名：保留 AAAA，供 IPv6 直连（不带 disable-ipv6）
+  nameserver-policy:
+    'rule-set:GeoCn':
+      - https://dns.alidns.com/dns-query
+      - https://doh.pub/dns-query
+    'rule-set:China':
+      - https://dns.alidns.com/dns-query
+      - https://doh.pub/dns-query
+    'rule-set:Private':
+      - https://dns.alidns.com/dns-query
+      - https://doh.pub/dns-query
   fake-ip-filter:
     - rule-set:GeoCn
     - rule-set:Private
