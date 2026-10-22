@@ -116,6 +116,33 @@ curl -s -H "Authorization: Bearer <secret>" http://127.0.0.1:9090/proxies \
 
 `type` 应该是 `URLTest` / `Selector` / `Fallback`，出现 `Smart` 就说明 `auto_smart_switch` 没关。
 
+### PPPoE 下别额外配 `wan6`
+
+`wan` 是 `proto pppoe` + `option ipv6 auto` 时，netifd 会自动建一个动态接口 **`wan_6`**（device = `pppoe-wan`，负责 DHCPv6 + PD）。如果 `network` 里还手写着一个 `config interface 'wan6'`（device `eth1`、proto `dhcpv6`），就成了**两个 DHCPv6 客户端**：
+
+| 现象 | 原因 |
+|---|---|
+| LuCI 里多出一个 `wan6`，且一直不 up | `eth1` 上是 PPPoE 封装，这层根本没有 IPv6 可用 |
+| 内网 IPv6 时通时断 / 完全不通 | 两个客户端各自向 ISP 要前缀，PD 来回换；`br-lan` 上同时挂着两个 /64 |
+| 终端抓到已失效的前缀，IPv6 直接不通 | odhcpd 把前缀持久化在 `/tmp/odhcpd-piofolder/`，PD 换了旧条目还在，会继续通告 |
+
+处理（`192.168.100.1` 实测）：
+
+```sh
+# 1) 删掉多余的那个，只留 netifd 自动建的 wan_6
+uci delete network.wan6 && uci commit network
+uci del_list firewall.@zone[1].network=wan6 && uci commit firewall
+/etc/init.d/network reload        # reload 不会重拨 PPPoE，公网 IP 不变
+
+# 2) 清前缀缓存，只通告当前 PD
+rm -f /tmp/odhcpd-piofolder/*
+/etc/init.d/odhcpd restart
+```
+
+验证：`ifstatus wan_6` 里应只有一个 `ipv6-prefix`；`ip -6 addr show br-lan` 只有一个 `2408:` 开头的 /64；`ip -6 neigh show dev br-lan` 不再出现旧前缀。
+
+改前缀长度（`ip6assign`）或换光猫、重拨后，**记得清一次 PIO 缓存**——否则终端会带着旧前缀的地址继续用，表现就是"IPv6 挂了但路由器自己能上网"。
+
 ## 快速开始
 
 ### 用聚合版（多段订阅 + 分档）
